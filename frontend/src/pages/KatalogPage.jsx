@@ -233,7 +233,7 @@ const KatalogPage = () => {
   };
 
   const handleDetail = (barangId) => {
-    navigate(`/barang/${barangId}`);
+    navigate(`/katalog/${barangId}`);
   };
 
   const getStatusColor = (status) => {
@@ -262,7 +262,7 @@ const KatalogPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header Section */}
