@@ -15,77 +15,54 @@ import {
   Truck,
   Eye,
   MoreVertical,
-  Share2
+  Share2,
+  RefreshCw
 } from 'lucide-react';
+import { katalogAPI } from '../../../../backend/api/service';
 
 const DetailAdminPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [barangDetail, setBarangDetail] = useState(null);
+  const [relatedBarang, setRelatedBarang] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Mock data - dalam implementasi nyata, data ini akan diambil dari API berdasarkan ID
-  const barangDetail = {
-    id: parseInt(id),
-    nama: "Tenda Dome 4 Person",
-    gambar: [
-      "https://images.unsplash.com/photo-1571687949921-1306bfb24c72?w=800&h=600&fit=crop&crop=center",
-      "https://images.unsplash.com/photo-1508873696983-2dfd5898f08b?w=800&h=600&fit=crop&crop=center",
-      "https://images.unsplash.com/photo-1504851149312-7a075b496cc7?w=800&h=600&fit=crop&crop=center",
-      "https://images.unsplash.com/photo-1539185441755-769473a23570?w=800&h=600&fit=crop&crop=center"
-    ],
-    kategori: "outdoor",
-    status: "tersedia",
-    totalDipinjam: 42,
-    maksPeminjaman: "7 hari",
-    kualitas: "Bagus",
-    deskripsi: "Tenda dome kapasitas 4 orang dengan desain modern dan material berkualitas tinggi. Dilengkapi dengan waterproof coating yang membuatnya tahan terhadap hujan dan embun. Cocok untuk camping keluarga atau kegiatan outdoor kelompok kecil.",
-    spesifikasi: [
-      "Kapasitas: 4 orang",
-      "Material: Polyester 210T dengan coating PU 3000mm",
-      "Dimensi: 220 x 220 x 130 cm",
-      "Berat: 3.8 kg",
-      "Warna: Orange/Abu-abu",
-      "Frame: Aluminium alloy",
-      "Waterproof: Yes (3000mm)"
-    ],
-    harga: 25000,
-    rating: 4.8,
-    totalUlasan: 24,
-    lokasi: "Gudang Utama",
-    stok: 5,
-    kondisi: "Baik",
-    catatan: "Barang sudah termasuk tas carrier dan poles tenda",
-    createdAt: "2024-01-15",
-    updatedAt: "2024-12-01"
-  };
+  // Load data barang detail dari backend
+  useEffect(() => {
+    const loadBarangDetail = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        
+        // Load detail barang
+        const response = await katalogAPI.getById(id);
+        console.log('Barang Detail Admin:', response.data); // Debug log
+        setBarangDetail(response.data);
 
-  const relatedBarang = [
-    {
-      id: 3,
-      nama: "Sleeping Bag -5°C",
-      gambar: "https://images.unsplash.com/photo-1544966503-7cc5ac882d5f?w=400&h=300&fit=crop&crop=center",
-      harga: 12000,
-      status: "tersedia"
-    },
-    {
-      id: 4,
-      nama: "Carrier 60L Expedition",
-      gambar: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=300&fit=crop&crop=center",
-      harga: 20000,
-      status: "tersedia"
-    },
-    {
-      id: 11,
-      nama: "Cooler Box 50L",
-      gambar: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=300&fit=crop&crop=center",
-      harga: 12000,
-      status: "tersedia"
+        // Load related barang
+        const relatedResponse = await katalogAPI.getAll({ 
+          kategori: response.data.kategori,
+          limit: 3 
+        });
+        setRelatedBarang(relatedResponse.data.filter(item => item._id !== id));
+      } catch (err) {
+        setError(err.message);
+        console.error('Error loading barang detail:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      loadBarangDetail();
     }
-  ];
+  }, [id]);
 
   const handleShare = () => {
-    const shareUrl = `${window.location.origin}/barang/${barangDetail.id}`;
+    const shareUrl = `${window.location.origin}/barang/${barangDetail._id}`;
     if (navigator.share) {
       navigator.share({
         title: barangDetail.nama,
@@ -100,25 +77,31 @@ const DetailAdminPage = () => {
   };
 
   const handleEdit = () => {
-    navigate(`/admin/editkatalog/${barangDetail.id}`);
+    navigate(`/admin/editkatalog/${barangDetail._id}`);
   };
 
   const handleDelete = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
-    // Simulasi delete action
-    console.log('Menghapus barang dengan ID:', barangDetail.id);
-    alert('Barang berhasil dihapus!');
-    navigate('/admin/barang');
+  const confirmDelete = async () => {
+    try {
+      await katalogAPI.delete(barangDetail._id);
+      alert('Barang berhasil dihapus!');
+      navigate('/admin/daftarkatalog');
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
-  const toggleStatus = () => {
-    // Simulasi toggle status
-    const newStatus = barangDetail.status === 'tersedia' ? 'tidak_tersedia' : 'tersedia';
-    console.log('Mengubah status menjadi:', newStatus);
-    alert(`Status berhasil diubah menjadi ${newStatus === 'tersedia' ? 'Tersedia' : 'Tidak Tersedia'}`);
+  const toggleStatus = async () => {
+    try {
+      const response = await katalogAPI.toggleStatus(barangDetail._id);
+      setBarangDetail(response.data);
+      alert(`Status berhasil diubah menjadi ${response.data.status === 'tersedia' ? 'Tersedia' : 'Tidak Tersedia'}`);
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const formatRupiah = (angka) => {
@@ -136,6 +119,94 @@ const DetailAdminPage = () => {
   const getStatusText = (status) => {
     return status === 'tersedia' ? 'Tersedia' : 'Tidak Tersedia';
   };
+
+  // Fungsi untuk menangani spesifikasi (bisa berupa array of strings atau array of objects)
+  const renderSpesifikasi = () => {
+    if (!barangDetail.spesifikasi || !Array.isArray(barangDetail.spesifikasi)) {
+      return null;
+    }
+
+    return barangDetail.spesifikasi.map((spec, index) => {
+      // Jika spesifikasi adalah string langsung
+      if (typeof spec === 'string') {
+        return (
+          <div key={index} className="flex items-center space-x-3">
+            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+            <span className="text-gray-600">{spec}</span>
+          </div>
+        );
+      }
+      
+      // Jika spesifikasi adalah object dengan properti 'nama' dan 'nilai'
+      if (spec && typeof spec === 'object' && spec.nama && spec.nilai) {
+        return (
+          <div key={spec._id || index} className="flex items-center space-x-3">
+            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+            <span className="text-gray-600">
+              <strong>{spec.nama}:</strong> {spec.nilai}
+            </span>
+          </div>
+        );
+      }
+      
+      // Jika spesifikasi adalah object dengan properti lain
+      if (spec && typeof spec === 'object') {
+        return (
+          <div key={index} className="flex items-center space-x-3">
+            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+            <span className="text-gray-600">
+              {Object.values(spec).join(' - ')}
+            </span>
+          </div>
+        );
+      }
+
+      return null;
+    });
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Memuat detail barang...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !barangDetail) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <button
+            onClick={() => navigate('/admin/daftarkatalog')}
+            className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors duration-300 mb-6"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>Kembali ke Katalog</span>
+          </button>
+          
+          <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package className="w-8 h-8 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Barang Tidak Ditemukan</h2>
+            <p className="text-gray-600 mb-6">{error || 'Barang yang Anda cari tidak ditemukan.'}</p>
+            <button
+              onClick={() => navigate('/admin/daftarkatalog')}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300"
+            >
+              Kembali ke Katalog
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -197,30 +268,35 @@ const DetailAdminPage = () => {
             {/* Main Image */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
               <img
-                src={barangDetail.gambar[selectedImage]}
+                src={barangDetail.gambar && barangDetail.gambar.length > 0 
+                  ? `http://localhost:5000${barangDetail.gambar[selectedImage]?.url || barangDetail.gambar[selectedImage]}`
+                  : '/placeholder-image.jpg'
+                }
                 alt={barangDetail.nama}
                 className="w-full h-96 object-cover"
               />
             </div>
 
             {/* Thumbnail Images */}
-            <div className="grid grid-cols-4 gap-3">
-              {barangDetail.gambar.map((gambar, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedImage(index)}
-                  className={`bg-white rounded-xl shadow-md overflow-hidden border-2 transition-all duration-300 ${
-                    selectedImage === index ? 'border-blue-500 scale-105' : 'border-transparent'
-                  }`}
-                >
-                  <img
-                    src={gambar}
-                    alt={`${barangDetail.nama} ${index + 1}`}
-                    className="w-full h-20 object-cover"
-                  />
-                </button>
-              ))}
-            </div>
+            {barangDetail.gambar && barangDetail.gambar.length > 1 && (
+              <div className="grid grid-cols-4 gap-3">
+                {barangDetail.gambar.map((gambar, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImage(index)}
+                    className={`bg-white rounded-xl shadow-md overflow-hidden border-2 transition-all duration-300 ${
+                      selectedImage === index ? 'border-blue-500 scale-105' : 'border-transparent'
+                    }`}
+                  >
+                    <img
+                      src={`http://localhost:5000${gambar?.url || gambar}`}
+                      alt={`${barangDetail.nama} ${index + 1}`}
+                      className="w-full h-20 object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right Column - Product Info */}
@@ -231,7 +307,7 @@ const DetailAdminPage = () => {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <span className="inline-block px-3 py-1 bg-blue-100 text-blue-600 text-sm font-medium rounded-full mb-3">
-                    {barangDetail.kategori.toUpperCase()}
+                    {barangDetail.kategori?.toUpperCase() || 'BARANG'}
                   </span>
                   <h1 className="text-3xl font-bold text-gray-900 mb-2">
                     {barangDetail.nama}
@@ -243,12 +319,12 @@ const DetailAdminPage = () => {
               <div className="flex items-center space-x-2 mb-4">
                 <div className="flex items-center space-x-1">
                   <Star className="w-5 h-5 text-yellow-500 fill-current" />
-                  <span className="font-semibold text-gray-800">{barangDetail.rating}</span>
+                  <span className="font-semibold text-gray-800">{barangDetail.rating || 4.5}</span>
                 </div>
                 <span className="text-gray-500">•</span>
-                <span className="text-gray-600">{barangDetail.totalUlasan} ulasan</span>
+                <span className="text-gray-600">{barangDetail.totalUlasan || 0} ulasan</span>
                 <span className="text-gray-500">•</span>
-                <span className="text-gray-600">{barangDetail.totalDipinjam}x dipinjam</span>
+                <span className="text-gray-600">{barangDetail.totalDipinjam || 0}x dipinjam</span>
               </div>
 
               {/* Status */}
@@ -338,11 +414,11 @@ const DetailAdminPage = () => {
                 </li>
                 <li className="flex items-start space-x-2">
                   <Users className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>Total dipinjam: {barangDetail.totalDipinjam} kali</span>
+                  <span>Total dipinjam: {barangDetail.totalDipinjam || 0} kali</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <Package className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <span>Dibuat: {barangDetail.createdAt} • Diupdate: {barangDetail.updatedAt}</span>
+                  <span>Dibuat: {new Date(barangDetail.createdAt).toLocaleDateString('id-ID')} • Diupdate: {new Date(barangDetail.updatedAt).toLocaleDateString('id-ID')}</span>
                 </li>
               </ul>
             </div>
@@ -361,25 +437,24 @@ const DetailAdminPage = () => {
               <p className="text-gray-600 leading-relaxed">
                 {barangDetail.deskripsi}
               </p>
-              <div className="mt-4 p-4 bg-gray-50 rounded-xl">
-                <p className="text-sm text-gray-600">
-                  <strong>Catatan Admin:</strong> {barangDetail.catatan}
-                </p>
-              </div>
+              {barangDetail.catatan && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-xl">
+                  <p className="text-sm text-gray-600">
+                    <strong>Catatan Admin:</strong> {barangDetail.catatan}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Specifications */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Spesifikasi Teknis</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {barangDetail.spesifikasi.map((spec, index) => (
-                  <div key={index} className="flex items-center space-x-3">
-                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <span className="text-gray-600">{spec}</span>
-                  </div>
-                ))}
+            {barangDetail.spesifikasi && Array.isArray(barangDetail.spesifikasi) && barangDetail.spesifikasi.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">Spesifikasi Teknis</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {renderSpesifikasi()}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Related Products & Quick Actions */}
@@ -430,12 +505,15 @@ const DetailAdminPage = () => {
               <div className="space-y-4">
                 {relatedBarang.map((barang) => (
                   <div
-                    key={barang.id}
+                    key={barang._id}
                     className="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors duration-300"
-                    onClick={() => navigate(`/admin/barang/detail/${barang.id}`)}
+                    onClick={() => navigate(`/admin/katalog/detail/${barang._id}`)}
                   >
                     <img
-                      src={barang.gambar}
+                      src={barang.gambar && barang.gambar.length > 0 
+                        ? `http://localhost:5000${barang.gambar[0]?.url || barang.gambar[0]}`
+                        : '/placeholder-image.jpg'
+                      }
                       alt={barang.nama}
                       className="w-12 h-12 object-cover rounded-lg"
                     />

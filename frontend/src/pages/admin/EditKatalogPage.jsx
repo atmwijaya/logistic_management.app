@@ -4,13 +4,13 @@ import {
   ArrowLeft, 
   Upload, 
   X, 
-  Image as ImageIcon,
   Package,
   Save,
   Plus,
   Trash2,
   Edit
 } from 'lucide-react';
+import { katalogAPI } from '../../../../backend/api/service';
 
 const EditKatalogPage = () => {
   const { id } = useParams();
@@ -20,6 +20,7 @@ const EditKatalogPage = () => {
   const [images, setImages] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nama: '',
     kategori: 'outdoor',
@@ -33,98 +34,44 @@ const EditKatalogPage = () => {
     spesifikasi: ['']
   });
 
-  // Mock data - dalam implementasi nyata, data ini akan diambil dari API berdasarkan ID
-  const barangData = [
-    {
-      id: 1,
-      nama: "Tenda Dome 4 Person",
-      gambar: [
-        "https://images.unsplash.com/photo-1571687949921-1306bfb24c72?w=400&h=300&fit=crop&crop=center",
-        "https://images.unsplash.com/photo-1508873696983-2dfd5898f08b?w=400&h=300&fit=crop&crop=center",
-        "https://images.unsplash.com/photo-1504851149312-7a075b496cc7?w=400&h=300&fit=crop&crop=center"
-      ],
-      kategori: "outdoor",
-      status: "tersedia",
-      totalDipinjam: 42,
-      maksPeminjaman: "7 hari",
-      kualitas: "Bagus",
-      deskripsi: "Tenda dome kapasitas 4 orang, waterproof, cocok untuk camping keluarga atau kelompok kecil. Dilengkapi dengan waterproof coating yang membuatnya tahan terhadap hujan dan embun.",
-      harga: 25000,
-      rating: 4.8,
-      lokasi: "Gudang Utama",
-      stok: 5,
-      spesifikasi: [
-        "Kapasitas: 4 orang",
-        "Material: Polyester 210T dengan coating PU 3000mm",
-        "Dimensi: 220 x 220 x 130 cm",
-        "Berat: 3.8 kg",
-        "Warna: Orange/Abu-abu",
-        "Frame: Aluminium alloy",
-        "Waterproof: Yes (3000mm)"
-      ],
-      createdAt: "2024-01-15"
-    },
-    {
-      id: 2,
-      nama: "Kompor Portable Gas",
-      gambar: [
-        "https://images.unsplash.com/photo-1606811841685-b30c2255c99a?w=400&h=300&fit=crop&crop=center"
-      ],
-      kategori: "outdoor",
-      status: "tidak_tersedia",
-      totalDipinjam: 38,
-      maksPeminjaman: "14 hari",
-      kualitas: "Sangat Bagus",
-      deskripsi: "Kompor portable dengan sistem gas cartridge, praktis dan mudah dibawa untuk aktivitas outdoor.",
-      harga: 15000,
-      rating: 4.9,
-      lokasi: "Gudang Utama",
-      stok: 3,
-      spesifikasi: [
-        "Tipe: Gas portable",
-        "Bahan bakar: Gas cartridge",
-        "Output: 2800W",
-        "Berat: 450g",
-        "Dilengkapi dengan carrying case"
-      ],
-      createdAt: "2024-01-10"
-    }
-  ];
-
   useEffect(() => {
-    // Simulasi loading data dari API
-    const loadBarangData = () => {
-      setIsLoading(true);
-      setTimeout(() => {
-        const barang = barangData.find(item => item.id === parseInt(id));
-        if (barang) {
-          setFormData({
-            nama: barang.nama,
-            kategori: barang.kategori,
-            status: barang.status,
-            harga: barang.harga.toString(),
-            stok: barang.stok.toString(),
-            maksPeminjaman: barang.maksPeminjaman,
-            kualitas: barang.kualitas,
-            deskripsi: barang.deskripsi,
-            lokasi: barang.lokasi,
-            spesifikasi: barang.spesifikasi
-          });
-          setExistingImages(barang.gambar.map((url, index) => ({
-            id: `existing-${index}`,
-            url: url,
-            name: `Gambar ${index + 1}`,
-            isExisting: true
-          })));
-        }
+    const loadBarangData = async () => {
+      try {
+        setIsLoading(true);
+        const response = await katalogAPI.getById(id);
+        const barang = response.data;
+        
+        setFormData({
+          nama: barang.nama,
+          kategori: barang.kategori,
+          status: barang.status,
+          harga: barang.harga.toString(),
+          stok: barang.stok.toString(),
+          maksPeminjaman: barang.maksPeminjaman,
+          kualitas: barang.kualitas,
+          deskripsi: barang.deskripsi,
+          lokasi: barang.lokasi,
+          spesifikasi: barang.spesifikasi.map(spec => spec.nilai ? `${spec.nama}: ${spec.nilai}` : spec)
+        });
+
+        setExistingImages(barang.gambar.map((img, index) => ({
+          id: img._id,
+          url: `http://localhost:5000${img.url}`,
+          name: img.namaFile,
+          isExisting: true
+        })));
+      } catch (error) {
+        alert(error.message);
+        navigate('/admin/daftarkatalog');
+      } finally {
         setIsLoading(false);
-      }, 1000);
+      }
     };
 
     loadBarangData();
-  }, [id]);
+  }, [id, navigate]);
 
-  // Handle drag events
+  // Handle drag events (sama seperti CreateKatalogPage)
   const handleDragEnter = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -164,28 +111,18 @@ const EditKatalogPage = () => {
       return;
     }
 
-    // Convert files to data URLs
-    imageFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImages(prev => [...prev, {
-          id: Date.now() + Math.random(),
-          file: file,
-          url: e.target.result,
-          name: file.name,
-          isNew: true
-        }]);
-      };
-      reader.readAsDataURL(file);
-    });
+    setImages(prev => [...prev, ...imageFiles.map(file => ({
+      id: Date.now() + Math.random(),
+      file: file,
+      name: file.name,
+      isNew: true
+    }))]);
   };
 
   const removeImage = (id) => {
-    // Jika gambar existing, hapus dari existingImages
     if (id.startsWith('existing-')) {
       setExistingImages(prev => prev.filter(img => img.id !== id));
     } else {
-      // Jika gambar baru, hapus dari images
       setImages(prev => prev.filter(img => img.id !== id));
     }
   };
@@ -230,7 +167,7 @@ const EditKatalogPage = () => {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validasi
@@ -245,19 +182,49 @@ const EditKatalogPage = () => {
       return;
     }
 
-    // Simulasi update data
-    const updatedBarang = {
-      id: parseInt(id),
-      ...formData,
-      harga: parseInt(formData.harga),
-      stok: parseInt(formData.stok),
-      images: allImages.map(img => img.url),
-      updatedAt: new Date().toISOString()
-    };
+    try {
+      setLoading(true);
 
-    console.log('Barang diperbarui:', updatedBarang);
-    alert('Barang berhasil diperbarui!');
-    navigate('/admin/barang');
+      // Create FormData object
+      const submitData = new FormData();
+      
+      // Append form data
+      submitData.append('nama', formData.nama);
+      submitData.append('kategori', formData.kategori);
+      submitData.append('status', formData.status);
+      submitData.append('harga', formData.harga);
+      submitData.append('stok', formData.stok);
+      submitData.append('maksPeminjaman', formData.maksPeminjaman);
+      submitData.append('kualitas', formData.kualitas);
+      submitData.append('deskripsi', formData.deskripsi);
+      submitData.append('lokasi', formData.lokasi);
+      
+      // Append existing images
+      const existingImageIds = existingImages.map(img => img.id);
+      submitData.append('existingImages', JSON.stringify(existingImageIds));
+      
+      // Append spesifikasi
+      formData.spesifikasi.forEach((spec, index) => {
+        if (spec.trim() !== '') {
+          submitData.append('spesifikasi', spec);
+        }
+      });
+
+      // Append new images
+      images.forEach((image) => {
+        submitData.append('gambar', image.file);
+      });
+
+      // Send to API
+      const response = await katalogAPI.update(id, submitData);
+      
+      alert('Barang berhasil diperbarui!');
+      navigate('/admin/daftarkatalog');
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (isLoading) {
@@ -362,7 +329,7 @@ const EditKatalogPage = () => {
                   {allImages.map((image, index) => (
                     <div key={image.id} className="relative group">
                       <img
-                        src={image.url}
+                        src={image.isExisting ? image.url : URL.createObjectURL(image.file)}
                         alt={`Preview ${index + 1}`}
                         className="w-full h-24 object-cover rounded-lg"
                       />
@@ -398,6 +365,7 @@ const EditKatalogPage = () => {
             <h2 className="text-xl font-bold text-gray-900 mb-6">Informasi Dasar</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Form fields sama seperti CreateKatalogPage */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Nama Barang *
@@ -428,6 +396,7 @@ const EditKatalogPage = () => {
                 </select>
               </div>
 
+              {/* ... sisa form fields ... */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Status *
@@ -590,7 +559,7 @@ const EditKatalogPage = () => {
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
               <button
                 type="button"
-                onClick={() => navigate('/admin/barang')}
+                onClick={() => navigate('/admin/daftarkatalog')}
                 className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-2xl font-semibold hover:bg-gray-200 transition-all duration-300 flex items-center justify-center space-x-2"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -598,10 +567,20 @@ const EditKatalogPage = () => {
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-semibold shadow-lg hover:shadow-xl hover:bg-blue-700 transition-all duration-300 flex items-center justify-center space-x-2"
+                disabled={loading}
+                className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-semibold shadow-lg hover:shadow-xl hover:bg-blue-700 transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-5 h-5" />
-                <span>Simpan Perubahan</span>
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    <span>Simpan Perubahan</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

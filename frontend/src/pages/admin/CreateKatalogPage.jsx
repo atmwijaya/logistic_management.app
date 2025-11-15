@@ -4,18 +4,19 @@ import {
   ArrowLeft, 
   Upload, 
   X, 
-  Image as ImageIcon,
   Package,
   Save,
   Plus,
   Trash2
 } from 'lucide-react';
+import { katalogAPI } from '../../../../backend/api/service';
 
 const CreateKatalogPage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     nama: '',
     kategori: 'outdoor',
@@ -69,19 +70,12 @@ const CreateKatalogPage = () => {
       return;
     }
 
-    // Convert files to data URLs
-    imageFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImages(prev => [...prev, {
-          id: Date.now() + Math.random(),
-          file: file,
-          url: e.target.result,
-          name: file.name
-        }]);
-      };
-      reader.readAsDataURL(file);
-    });
+    // Tambahkan file ke state
+    setImages(prev => [...prev, ...imageFiles.map(file => ({
+      id: Date.now() + Math.random(),
+      file: file,
+      name: file.name
+    }))]);
   };
 
   const removeImage = (id) => {
@@ -128,7 +122,7 @@ const CreateKatalogPage = () => {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validasi
@@ -142,21 +136,50 @@ const CreateKatalogPage = () => {
       return;
     }
 
-    // Simulasi penyimpanan data
-    const newBarang = {
-      id: Date.now(),
-      ...formData,
-      harga: parseInt(formData.harga),
-      stok: parseInt(formData.stok),
-      images: images.map(img => img.url),
-      totalDipinjam: 0,
-      rating: 4.5,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
+    if (formData.deskripsi.length < 50) {
+      alert('Deskripsi minimal 50 karakter');
+      return;
+    }
 
-    console.log('Barang baru:', newBarang);
-    alert('Barang berhasil ditambahkan!');
-    navigate('/admin/daftarkatalog');
+    try {
+      setLoading(true);
+
+      // Create FormData object
+      const submitData = new FormData();
+      
+      // Append form data
+      submitData.append('nama', formData.nama);
+      submitData.append('kategori', formData.kategori);
+      submitData.append('status', formData.status);
+      submitData.append('harga', formData.harga);
+      submitData.append('stok', formData.stok);
+      submitData.append('maksPeminjaman', formData.maksPeminjaman);
+      submitData.append('kualitas', formData.kualitas);
+      submitData.append('deskripsi', formData.deskripsi);
+      submitData.append('lokasi', formData.lokasi);
+      
+      // Append spesifikasi
+      formData.spesifikasi.forEach((spec, index) => {
+        if (spec.trim() !== '') {
+          submitData.append('spesifikasi', spec);
+        }
+      });
+
+      // Append images
+      images.forEach((image) => {
+        submitData.append('gambar', image.file);
+      });
+
+      // Send to API
+      const response = await katalogAPI.create(submitData);
+      
+      alert('Barang berhasil ditambahkan!');
+      navigate('/admin/daftarkatalog');
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -241,7 +264,7 @@ const CreateKatalogPage = () => {
                   {images.map((image, index) => (
                     <div key={image.id} className="relative group">
                       <img
-                        src={image.url}
+                        src={URL.createObjectURL(image.file)}
                         alt={`Preview ${index + 1}`}
                         className="w-full h-24 object-cover rounded-lg"
                       />
@@ -270,6 +293,7 @@ const CreateKatalogPage = () => {
             <h2 className="text-xl font-bold text-gray-900 mb-6">Informasi Dasar</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Form fields tetap sama seperti sebelumnya */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Nama Barang *
@@ -300,6 +324,7 @@ const CreateKatalogPage = () => {
                 </select>
               </div>
 
+              {/* ... sisa form fields sama seperti sebelumnya ... */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Status *
@@ -414,7 +439,7 @@ const CreateKatalogPage = () => {
                 placeholder="Jelaskan detail barang, fitur, keunggulan, dan informasi penting lainnya..."
               />
               <p className="text-gray-500 text-sm mt-2">
-                Minimal 50 karakter. Jelaskan dengan detail untuk membantu peminjam memahami barang.
+                {formData.deskripsi.length} karakter. Minimal 50 karakter.
               </p>
             </div>
           </div>
@@ -462,7 +487,7 @@ const CreateKatalogPage = () => {
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
               <button
                 type="button"
-                onClick={() => navigate('/admin/barang')}
+                onClick={() => navigate('/admin/daftarkatalog')}
                 className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-2xl font-semibold hover:bg-gray-200 transition-all duration-300 flex items-center justify-center space-x-2"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -470,10 +495,20 @@ const CreateKatalogPage = () => {
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-semibold shadow-lg hover:shadow-xl hover:bg-blue-700 transition-all duration-300 flex items-center justify-center space-x-2"
+                disabled={loading}
+                className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-semibold shadow-lg hover:shadow-xl hover:bg-blue-700 transition-all duration-300 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-5 h-5" />
-                <span>Simpan Barang</span>
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    <span>Simpan Barang</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

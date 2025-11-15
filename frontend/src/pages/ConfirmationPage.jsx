@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Calendar, Users, MapPin, Package, MessageCircle, CheckCircle, Star, Home, Check } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, MapPin, Package, MessageCircle, CheckCircle, Star, Home, Check, RefreshCw } from 'lucide-react';
+import { katalogAPI } from '../../../backend/api/service';
 
 const ConfirmationPage = () => {
   const { id } = useParams();
@@ -18,44 +19,31 @@ const ConfirmationPage = () => {
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submissionTime, setSubmissionTime] = useState('');
+  const [selectedBarang, setSelectedBarang] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Data barang (sama dengan yang di komponen sebelumnya)
-  const allBarang = [
-    {
-      id: 1,
-      nama: "Tenda Dome 4 Person",
-      gambar: "https://images.unsplash.com/photo-1571687949921-1306bfb24c72?w=400&h=300&fit=crop&crop=center",
-      kategori: "outdoor",
-      status: "tersedia",
-      totalDipinjam: 42,
-      maksPeminjaman: "7 hari",
-      kualitas: "Bagus",
-      deskripsi: "Tenda dome kapasitas 4 orang, waterproof, cocok untuk camping keluarga atau kelompok kecil.",
-      harga: 25000,
-      rating: 4.8,
-      lokasi: "Gudang Utama",
-      stok: 5
-    },
-    {
-      id: 2,
-      nama: "Kompor Portable Gas",
-      gambar: "https://images.unsplash.com/photo-1606811841685-b30c2255c99a?w=400&h=300&fit=crop&crop=center",
-      kategori: "outdoor",
-      status: "tersedia",
-      totalDipinjam: 38,
-      maksPeminjaman: "14 hari",
-      kualitas: "Sangat Bagus",
-      deskripsi: "Kompor portable dengan sistem gas cartridge, praktis dan mudah dibawa untuk aktivitas outdoor.",
-      harga: 15000,
-      rating: 4.9,
-      lokasi: "Gudang Utama",
-      stok: 3
-    },
-    // ... tambahkan data barang lainnya sesuai kebutuhan
-  ];
+  // Load data barang dari backend
+  useEffect(() => {
+    const loadBarangDetail = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        
+        const response = await katalogAPI.getById(id);
+        setSelectedBarang(response.data);
+      } catch (err) {
+        setError(err.message);
+        console.error('Error loading barang detail:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Cari barang berdasarkan ID
-  const selectedBarang = allBarang.find(barang => barang.id === parseInt(id)) || allBarang[0];
+    if (id) {
+      loadBarangDetail();
+    }
+  }, [id]);
 
   // Format tanggal ke DD/MM/YYYY
   const formatDateToDDMMYYYY = (dateString) => {
@@ -81,6 +69,7 @@ const ConfirmationPage = () => {
 
   // Hitung total harga
   const calculateTotalHarga = () => {
+    if (!selectedBarang) return 0;
     const totalHari = calculateTotalHari();
     return selectedBarang.harga * totalHari * formData.jumlahPinjam;
   };
@@ -97,6 +86,8 @@ const ConfirmationPage = () => {
   // Handle submit
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    if (!selectedBarang) return;
     
     const totalHari = calculateTotalHari();
     const totalHarga = calculateTotalHarga();
@@ -135,6 +126,49 @@ const ConfirmationPage = () => {
 
   // Set tanggal minimum (hari ini)
   const today = new Date().toISOString().split('T')[0];
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Memuat data barang...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !selectedBarang) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center space-x-2 text-slate-600 hover:text-slate-800 transition-colors duration-300 mb-6"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>Kembali</span>
+          </button>
+          
+          <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package className="w-8 h-8 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Barang Tidak Ditemukan</h2>
+            <p className="text-gray-600 mb-6">{error || 'Barang yang Anda cari tidak ditemukan.'}</p>
+            <button
+              onClick={() => navigate('/katalog')}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300"
+            >
+              Kembali ke Katalog
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Tampilan setelah submit
   if (isSubmitted) {
@@ -234,7 +268,10 @@ const ConfirmationPage = () => {
             {/* Product Image */}
             <div className="lg:w-1/3">
               <img
-                src={selectedBarang.gambar}
+                src={selectedBarang.gambar && selectedBarang.gambar.length > 0 
+                  ? `http://localhost:5000${selectedBarang.gambar[0].url}`
+                  : '/placeholder-image.jpg'
+                }
                 alt={selectedBarang.nama}
                 className="w-full h-64 object-cover rounded-xl"
               />
@@ -253,10 +290,10 @@ const ConfirmationPage = () => {
                   <div className="flex items-center space-x-4 mb-4">
                     <div className="flex items-center space-x-1">
                       <Star className="w-5 h-5 text-yellow-500 fill-current" />
-                      <span className="font-semibold text-slate-800">{selectedBarang.rating}</span>
+                      <span className="font-semibold text-slate-800">{selectedBarang.rating || 4.5}</span>
                     </div>
                     <span className="text-slate-500">•</span>
-                    <span className="text-slate-600">{selectedBarang.totalDipinjam}x dipinjam</span>
+                    <span className="text-slate-600">{selectedBarang.totalDipinjam || 0}x dipinjam</span>
                   </div>
                 </div>
               </div>

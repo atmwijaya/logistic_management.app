@@ -11,125 +11,50 @@ import {
   Package,
   Eye,
   EyeOff,
-  MoreVertical
+  MoreVertical,
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { katalogAPI } from '../../../../backend/api/service';
 
 const KatalogAdminPage = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('semua');
   const [statusFilter, setStatusFilter] = useState('semua');
-  const [layoutMode, setLayoutMode] = useState('grid'); // 'grid' or 'list'
+  const [layoutMode, setLayoutMode] = useState('grid');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedBarang, setSelectedBarang] = useState(null);
   const [barangData, setBarangData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Data barang awal
-  const initialBarangData = [
-    {
-      id: 1,
-      nama: "Tenda Dome 4 Person",
-      gambar: "https://images.unsplash.com/photo-1571687949921-1306bfb24c72?w=400&h=300&fit=crop&crop=center",
-      kategori: "outdoor",
-      status: "tersedia",
-      totalDipinjam: 42,
-      maksPeminjaman: "7 hari",
-      kualitas: "Bagus",
-      deskripsi: "Tenda dome kapasitas 4 orang, waterproof, cocok untuk camping keluarga atau kelompok kecil.",
-      harga: 25000,
-      rating: 4.8,
-      lokasi: "Gudang Utama",
-      stok: 5,
-      createdAt: "2024-01-15"
-    },
-    {
-      id: 2,
-      nama: "Kompor Portable Gas",
-      gambar: "https://images.unsplash.com/photo-1606811841685-b30c2255c99a?w=400&h=300&fit=crop&crop=center",
-      kategori: "outdoor",
-      status: "tidak_tersedia",
-      totalDipinjam: 38,
-      maksPeminjaman: "14 hari",
-      kualitas: "Sangat Bagus",
-      deskripsi: "Kompor portable dengan sistem gas cartridge, praktis dan mudah dibawa untuk aktivitas outdoor.",
-      harga: 15000,
-      rating: 4.9,
-      lokasi: "Gudang Utama",
-      stok: 3,
-      createdAt: "2024-01-10"
-    },
-    {
-      id: 3,
-      nama: "Sleeping Bag -5°C",
-      gambar: "https://images.unsplash.com/photo-1544966503-7cc5ac882d5f?w=400&h=300&fit=crop&crop=center",
-      kategori: "outdoor",
-      status: "tersedia",
-      totalDipinjam: 35,
-      maksPeminjaman: "10 hari",
-      kualitas: "Bagus",
-      deskripsi: "Sleeping bag tahan hingga suhu -5°C, bahan waterproof, nyaman untuk camping di daerah dingin.",
-      harga: 12000,
-      rating: 4.7,
-      lokasi: "Gudang A",
-      stok: 8,
-      createdAt: "2024-01-08"
-    },
-    {
-      id: 4,
-      nama: "Kursi Lipat Portable",
-      gambar: "https://images.unsplash.com/photo-1503602642458-232111445657?w=400&h=300&fit=crop&crop=center",
-      kategori: "indoor",
-      status: "tersedia",
-      totalDipinjam: 25,
-      maksPeminjaman: "14 hari",
-      kualitas: "Bagus",
-      deskripsi: "Kursi lipat portable yang ringan dan mudah dibawa, cocok untuk acara indoor dan outdoor ringan.",
-      harga: 7000,
-      rating: 4.4,
-      lokasi: "Gudang Utama",
-      stok: 12,
-      createdAt: "2024-01-05"
-    },
-    {
-      id: 5,
-      nama: "Speaker Bluetooth Outdoor",
-      gambar: "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400&h=300&fit=crop&crop=center",
-      kategori: "outdoor",
-      status: "tidak_tersedia",
-      totalDipinjam: 33,
-      maksPeminjaman: "10 hari",
-      kualitas: "Sangat Bagus",
-      deskripsi: "Speaker Bluetooth tahan air dan debu, suara jernih dengan baterai tahan lama hingga 12 jam.",
-      harga: 18000,
-      rating: 4.7,
-      lokasi: "Gudang B",
-      stok: 2,
-      createdAt: "2024-01-03"
-    },
-    {
-      id: 6,
-      nama: "Meja Lipat Aluminium",
-      gambar: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&h=300&fit=crop&crop=center",
-      kategori: "indoor",
-      status: "tersedia",
-      totalDipinjam: 22,
-      maksPeminjaman: "21 hari",
-      kualitas: "Bagus",
-      deskripsi: "Meja lipat aluminium ringan dengan permukaan melamin, cocok untuk berbagai keperluan.",
-      harga: 15000,
-      rating: 4.3,
-      lokasi: "Gudang A",
-      stok: 6,
-      createdAt: "2024-01-02"
+  // Load data dari backend
+  const loadBarangData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const params = {};
+      if (searchTerm) params.search = searchTerm;
+      if (selectedCategory !== 'semua') params.kategori = selectedCategory;
+      if (statusFilter !== 'semua') params.status = statusFilter;
+      
+      const response = await katalogAPI.getAll(params);
+      setBarangData(response.data);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error loading data:', err);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   useEffect(() => {
-    setBarangData(initialBarangData);
-  }, []);
+    loadBarangData();
+  }, [searchTerm, selectedCategory, statusFilter]);
 
-  // Filter barang
+  // Filter barang (client-side untuk real-time filtering)
   const filteredBarang = barangData.filter(barang => {
     const matchesSearch = barang.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          barang.deskripsi.toLowerCase().includes(searchTerm.toLowerCase());
@@ -172,8 +97,7 @@ const KatalogAdminPage = () => {
   };
 
   const handleEdit = (barang) => {
-    // Navigate to edit page
-    navigate(`/admin/editkatalog/${barang.id}`);
+    navigate(`/admin/editkatalog/${barang._id}`);
   };
 
   const handleDelete = (barang) => {
@@ -181,14 +105,19 @@ const KatalogAdminPage = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
-    setBarangData(prev => prev.filter(item => item.id !== selectedBarang.id));
-    setShowDeleteModal(false);
-    setSelectedBarang(null);
+  const confirmDelete = async () => {
+    try {
+      await katalogAPI.delete(selectedBarang._id);
+      setBarangData(prev => prev.filter(item => item._id !== selectedBarang._id));
+      setShowDeleteModal(false);
+      setSelectedBarang(null);
+      alert('Barang berhasil dihapus!');
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const handleAddNew = () => {
-    // Navigate to add new item page
     navigate('/admin/createkatalog');
   };
 
@@ -196,13 +125,31 @@ const KatalogAdminPage = () => {
     navigate(`/admin/katalog/${barangId}`);
   };
 
-  const toggleStatus = (barangId) => {
-    setBarangData(prev => prev.map(item => 
-      item.id === barangId 
-        ? { ...item, status: item.status === 'tersedia' ? 'tidak_tersedia' : 'tersedia' }
-        : item
-    ));
+  const toggleStatus = async (barangId) => {
+    try {
+      const response = await katalogAPI.toggleStatus(barangId);
+      setBarangData(prev => prev.map(item => 
+        item._id === barangId ? response.data : item
+      ));
+    } catch (err) {
+      alert(err.message);
+    }
   };
+
+  const handleRefresh = () => {
+    loadBarangData();
+  };
+
+  if (loading && barangData.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Memuat data barang...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -215,15 +162,30 @@ const KatalogAdminPage = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Kelola Katalog Barang</h1>
               <p className="text-gray-600">Kelola semua barang inventaris Racana Diponegoro</p>
             </div>
-            <button
-              onClick={handleAddNew}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-2"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Tambah Barang</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleRefresh}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-2xl font-semibold transition-all duration-300 flex items-center space-x-2"
+              >
+                <RefreshCw className="w-5 h-5" />
+                <span>Refresh</span>
+              </button>
+              <button
+                onClick={handleAddNew}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-2"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Tambah Barang</span>
+              </button>
+            </div>
           </div>
         </div>
+
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-6">
+            <p>{error}</p>
+          </div>
+        )}
 
         {/* Filters and Controls */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
@@ -299,6 +261,7 @@ const KatalogAdminPage = () => {
             <span className="text-gray-600">
               Menampilkan {filteredBarang.length} barang
             </span>
+            {loading && <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />}
           </div>
         </div>
 
@@ -307,14 +270,16 @@ const KatalogAdminPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {filteredBarang.map((barang) => (
               <div
-                key={barang.id}
+                key={barang._id}
                 className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden"
-                onClick={() => handleDetail(barang.id)}
+                onClick={() => handleDetail(barang._id)}
               >
                 {/* Image */}
                 <div className="relative overflow-hidden">
                   <img
-                    src={barang.gambar}
+                    src={barang.gambar && barang.gambar.length > 0 ? 
+                         `http://localhost:5000${barang.gambar[0].url}` : 
+                         '/placeholder-image.jpg'}
                     alt={barang.nama}
                     className="w-full h-48 object-cover"
                   />
@@ -369,7 +334,7 @@ const KatalogAdminPage = () => {
                     </div>
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleShare(barang.id)}
+                        onClick={() => handleShare(barang._id)}
                         className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-all duration-300"
                         title="Bagikan"
                       >
@@ -413,11 +378,13 @@ const KatalogAdminPage = () => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredBarang.map((barang) => (
-                  <tr key={barang.id} className="hover:bg-gray-50">
+                  <tr key={barang._id} className="hover:bg-gray-50">
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-4">
                         <img
-                          src={barang.gambar}
+                          src={barang.gambar && barang.gambar.length > 0 ? 
+                               `http://localhost:5000${barang.gambar[0].url}` : 
+                               '/placeholder-image.jpg'}
                           alt={barang.nama}
                           className="w-12 h-12 object-cover rounded-lg"
                         />
@@ -435,7 +402,7 @@ const KatalogAdminPage = () => {
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => toggleStatus(barang.id)}
+                          onClick={() => toggleStatus(barang._id)}
                           className={`w-8 h-4 rounded-full transition-colors duration-300 ${
                             barang.status === 'tersedia' ? 'bg-green-500' : 'bg-gray-300'
                           }`}
@@ -459,7 +426,7 @@ const KatalogAdminPage = () => {
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleShare(barang.id)}
+                          onClick={() => handleShare(barang._id)}
                           className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-300"
                           title="Bagikan"
                         >
@@ -496,7 +463,7 @@ const KatalogAdminPage = () => {
         )}
 
         {/* No Results */}
-        {filteredBarang.length === 0 && layoutMode === 'grid' && (
+        {filteredBarang.length === 0 && layoutMode === 'grid' && !loading && (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search className="w-12 h-12 text-gray-400" />
